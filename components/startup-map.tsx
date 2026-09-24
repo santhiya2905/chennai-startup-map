@@ -1,8 +1,9 @@
 "use client";
 
-import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
-import { divIcon } from "leaflet";
-import { useEffect, useMemo, useState } from "react";
+import L from "leaflet";
+import "leaflet.markercluster";
+import { useEffect, useRef } from "react";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import type { Startup } from "./types";
 
 type StartupMapProps = {
@@ -11,21 +12,9 @@ type StartupMapProps = {
   onSelect: (startup: Startup) => void;
 };
 
+type StartupMarker = L.Marker & { startupData?: Startup };
+
 const CHENNAI_CENTER: [number, number] = [13.0475, 80.209];
-
-function FlyToSelection({ selected }: { selected: Startup | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (selected?.lat != null && selected.lng != null) {
-      map.flyTo([selected.lat, selected.lng], Math.max(map.getZoom(), 14), {
-        duration: 0.8,
-      });
-    }
-  }, [map, selected]);
-
-  return null;
-}
 
 export default function StartupMap({ startups, selected, onSelect }: StartupMapProps) {
   return (
@@ -33,101 +22,170 @@ export default function StartupMap({ startups, selected, onSelect }: StartupMapP
       center={CHENNAI_CENTER}
       zoom={11}
       minZoom={9}
-      maxZoom={18}
+      maxZoom={20}
       zoomControl={false}
-      preferCanvas
+      zoomAnimation
+      markerZoomAnimation
+      fadeAnimation
+      zoomAnimationThreshold={8}
+      easeLinearity={0.18}
       className="map-canvas"
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxNativeZoom={19}
+        maxZoom={20}
       />
-      <MapPoints startups={startups} selected={selected} onSelect={onSelect} />
-      <FlyToSelection selected={selected} />
+      <ClusteredMarkers startups={startups} selected={selected} onSelect={onSelect} />
     </MapContainer>
   );
 }
 
-type PointGroup = { key: string; lat: number; lng: number; startups: Startup[] };
-
-function MapPoints({ startups, selected, onSelect }: StartupMapProps) {
+function ClusteredMarkers({ startups, selected, onSelect }: StartupMapProps) {
   const map = useMap();
-  const [zoom, setZoom] = useState(map.getZoom());
-  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersRef = useRef(new Map<string, StartupMarker>());
+  const previousSelectedRef = useRef<string | null>(null);
+  const mapClickedMarkerRef = useRef<string | null>(null);
 
-  const groups = useMemo<PointGroup[]>(() => {
-    const precision = zoom <= 10 ? 0.07 : zoom === 11 ? 0.035 : zoom === 12 ? 0.018 : zoom === 13 ? 0.009 : 0;
-    const buckets = new Map<string, Startup[]>();
-    startups.forEach((startup) => {
-      if (startup.lat == null || startup.lng == null) return;
-      const key = precision
-        ? `${Math.round(startup.lat / precision)}:${Math.round(startup.lng / precision)}`
-        : startup.id;
-      const bucket = buckets.get(key);
-      if (bucket) bucket.push(startup);
-      else buckets.set(key, [startup]);
+  useEffect(() => {
+    const cluster = L.markerClusterGroup({
+      maxClusterRadius: 45,
+      disableClusteringAtZoom: 16,
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: true,
+      removeOutsideVisibleBounds: true,
+      animate: true,
+      animateAddingMarkers: false,
+      chunkedLoading: true,
+      chunkInterval: 50,
+      chunkDelay: 10,
+      iconCreateFunction: createClusterIcon,
     });
-    return [...buckets.entries()].map(([key, items]) => ({
-      key,
-      startups: items,
-      lat: items.reduce((sum, item) => sum + (item.lat ?? 0), 0) / items.length,
-      lng: items.reduce((sum, item) => sum + (item.lng ?? 0), 0) / items.length,
-    }));
-  }, [startups, zoom]);
 
-  return groups.map((group) => {
-    if (group.startups.length > 1) {
-      const representative = group.startups.find((item) => item.logoUrl) ?? group.startups[0];
-      const size = group.startups.length > 99 ? 52 : group.startups.length > 19 ? 48 : 44;
-      const logoMarkup = representative.logoUrl
-        ? `<img class="map-marker-logo" src="${escapeAttribute(representative.logoUrl)}" alt="" />`
-        : `<b>${escapeText(representative.company.charAt(0).toUpperCase())}</b>`;
-      return (
-        <Marker
-          key={group.key}
-          position={[group.lat, group.lng]}
-          icon={divIcon({
-            className: "startup-cluster-wrap",
-            html: `<span class="startup-cluster" style="width:${size}px;height:${size}px"><span class="map-marker-logo-frame">${logoMarkup}</span><i>${group.startups.length}</i></span>`,
-            iconSize: [size, size],
-            iconAnchor: [size / 2, size / 2],
-            tooltipAnchor: [0, -size / 2],
-          })}
-          eventHandlers={{ click: () => map.flyTo([group.lat, group.lng], Math.min(zoom + 2, 15), { duration: 0.65 }) }}
-        >
-          <Tooltip direction="top" offset={[0, -5]} opacity={1}>
-            <strong>{representative.company}</strong>
-            <span>and {group.startups.length - 1} more nearby</span>
-          </Tooltip>
-        </Marker>
+    cluster.addTo(map);
+    clusterRef.current = cluster;
+
+    return () => {
+      cluster.clearLayers();
+      map.removeLayer(cluster);
+      clusterRef.current = null;
+      markersRef.current.clear();
+    };
+  }, [map]);
+
+  useEffect(() => {
+    const cluster = clusterRef.current;
+    if (!cluster) return;
+
+    cluster.clearLayers();
+    markersRef.current.clear();
+
+    const markers: StartupMarker[] = [];
+    for (const startup of startups) {
+      if (startup.lat == null || startup.lng == null) continue;
+
+      const marker = L.marker([startup.lat, startup.lng], {
+        icon: createCompanyIcon(startup),
+        keyboard: true,
+        riseOnHover: true,
+        title: startup.company,
+      }) as StartupMarker;
+
+      marker.startupData = startup;
+      marker.bindTooltip(
+        `<strong>${escapeText(startup.company)}</strong><span>${escapeText(startup.area || "Chennai")}</span>`,
+        { direction: "top", offset: L.point(0, -19), opacity: 1 },
       );
+      marker.on("click", () => {
+        mapClickedMarkerRef.current = startup.id;
+        onSelect(startup);
+      });
+      markersRef.current.set(startup.id, marker);
+      markers.push(marker);
     }
 
-    const startup = group.startups[0];
-    const active = startup.id === selected?.id;
-    const size = active ? 44 : zoom >= 14 ? 38 : 34;
-    const logoMarkup = startup.logoUrl
-      ? `<img class="map-marker-logo" src="${escapeAttribute(startup.logoUrl)}" alt="" />`
-      : `<b>${escapeText(startup.company.charAt(0).toUpperCase())}</b>`;
-    return (
-      <Marker
-        key={startup.id}
-        position={[group.lat, group.lng]}
-        icon={divIcon({
-          className: `company-map-marker-wrap${active ? " is-active" : ""}`,
-          html: `<span class="company-map-marker" style="width:${size}px;height:${size}px"><span class="map-marker-logo-frame">${logoMarkup}</span></span>`,
-          iconSize: [size, size],
-          iconAnchor: [size / 2, size / 2],
-          tooltipAnchor: [0, -size / 2],
-        })}
-        eventHandlers={{ click: () => onSelect(startup) }}
-      >
-        <Tooltip direction="top" offset={[0, -4]} opacity={1}>
-          <strong>{startup.company}</strong>
-          <span>{startup.area || "Chennai"}</span>
-        </Tooltip>
-      </Marker>
-    );
+    cluster.addLayers(markers);
+  }, [onSelect, startups]);
+
+  useEffect(() => {
+    const previousId = previousSelectedRef.current;
+    const previousMarker = previousId ? markersRef.current.get(previousId) : null;
+    if (previousMarker) {
+      previousMarker.closeTooltip();
+      previousMarker.setZIndexOffset(0);
+      previousMarker.getElement()?.classList.remove("is-active");
+    }
+
+    previousSelectedRef.current = selected?.id ?? null;
+    if (!selected || selected.lat == null || selected.lng == null) return;
+
+    const marker = markersRef.current.get(selected.id);
+    if (!marker) return;
+    const selectedFromMap = mapClickedMarkerRef.current === selected.id;
+    mapClickedMarkerRef.current = null;
+
+    const revealMarker = () => {
+      marker.setZIndexOffset(1000);
+      marker.getElement()?.classList.add("is-active");
+      marker.openTooltip();
+    };
+
+    const currentZoom = map.getZoom();
+    const targetZoom = selectedFromMap
+      ? (currentZoom < 16 ? Math.min(currentZoom + 1, 16) : currentZoom)
+      : Math.max(currentZoom, 16);
+    const companyPoint = map.project([selected.lat, selected.lng], targetZoom);
+    const panelOffset = window.innerWidth >= 768 ? 155 : 0;
+    const cameraCenter = map.unproject(companyPoint.add([panelOffset, 0]), targetZoom);
+    const needsCameraMove = map.getCenter().distanceTo(cameraCenter) > 12 || targetZoom !== currentZoom;
+
+    if (needsCameraMove) {
+      map.stop();
+      map.once("moveend", revealMarker);
+      map.flyTo(cameraCenter, targetZoom, {
+        duration: selectedFromMap ? 0.72 : Math.min(1.18, 0.76 + Math.abs(targetZoom - currentZoom) * 0.08),
+      });
+      return () => {
+        map.off("moveend", revealMarker);
+      };
+    }
+
+    revealMarker();
+  }, [map, selected]);
+
+  return null;
+}
+
+function createCompanyIcon(startup: Startup) {
+  const logo = startup.logoUrl
+    ? `<img class="map-marker-logo" src="${escapeAttribute(startup.logoUrl)}" alt="" loading="lazy" decoding="async" onerror="this.remove()" />`
+    : `<b>${escapeText(startup.company.charAt(0).toUpperCase())}</b>`;
+
+  return L.divIcon({
+    className: "company-map-marker-wrap",
+    html: `<span class="company-map-marker"><span class="map-marker-logo-frame">${logo}</span></span>`,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    tooltipAnchor: [0, -19],
+  });
+}
+
+function createClusterIcon(cluster: L.MarkerCluster) {
+  const children = cluster.getAllChildMarkers() as StartupMarker[];
+  const representative = children.find((marker) => marker.startupData?.logoUrl)?.startupData ?? children[0]?.startupData;
+  const count = cluster.getChildCount();
+  const size = count > 99 ? 52 : count > 19 ? 48 : 44;
+  const logo = representative?.logoUrl
+    ? `<img class="map-marker-logo" src="${escapeAttribute(representative.logoUrl)}" alt="" loading="lazy" decoding="async" onerror="this.remove()" />`
+    : `<b>${escapeText(representative?.company.charAt(0).toUpperCase() || "?")}</b>`;
+
+  return L.divIcon({
+    className: "startup-cluster-wrap",
+    html: `<span class="startup-cluster"><span class="map-marker-logo-frame">${logo}</span><i>${count}</i></span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 

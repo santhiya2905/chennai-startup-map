@@ -49,8 +49,6 @@ type JobOpportunity = {
   logoUrl: string;
 };
 
-type Hotspot = { area: string; count: number };
-
 function classifySector(value: string) {
   return SECTOR_RULES.find(([, matcher]) => matcher.test(value))?.[0] ?? "Other";
 }
@@ -126,14 +124,6 @@ function inferPosted(value: string) {
   return "Listed in dataset";
 }
 
-function heatmapArea(value: string) {
-  const area = value.split(/[,(]/)[0]?.trim() || "";
-  if (/^tharamani$/i.test(area)) return "Taramani";
-  if (/^t\.?\s*nagar$/i.test(area)) return "T. Nagar";
-  if (/^chennai\b/i.test(area) || !area) return "";
-  return area;
-}
-
 export default function StartupExplorer() {
   const [startups, setStartups] = useState<Startup[]>([]);
   const [query, setQuery] = useState("");
@@ -191,18 +181,6 @@ export default function StartupExplorer() {
     (jobLevel === "All levels" || job.level === jobLevel) &&
     (jobPosted === "Any time" || (jobPosted === "Current" ? job.posted === "Current signal" : job.posted !== "Current signal"))
   )), [jobCategory, jobLevel, jobPosted, jobs]);
-  const hotspots = useMemo<Hotspot[]>(() => {
-    const counts = new Map<string, number>();
-    startups.forEach((startup) => {
-      const hotspot = heatmapArea(startup.area);
-      if (hotspot) counts.set(hotspot, (counts.get(hotspot) ?? 0) + 1);
-    });
-    return [...counts.entries()]
-      .map(([hotspotArea, count]) => ({ area: hotspotArea, count }))
-      .sort((first, second) => second.count - first.count)
-      .slice(0, 6);
-  }, [startups]);
-
   useEffect(() => setVisibleCount(72), [deferredQuery, sector, area]);
 
   function clearFilters() {
@@ -286,8 +264,8 @@ export default function StartupExplorer() {
       ) : view === "map" ? (
         <section className="map-view" aria-label="Map of Chennai startups">
           <StartupMap startups={filtered} selected={selected} onSelect={setSelected} />
-          <HotspotPanel hotspots={hotspots} />
           <div className="result-pill"><span className="pulse" /> <b>{filtered.length.toLocaleString("en-IN")}</b> companies found</div>
+          <div className="by-pill">by S &amp; Y</div>
           <div className="map-key"><span>◆</span><p>Company locations</p></div>
           {filtered.length === 0 && <EmptyState onClear={clearFilters} />}
         </section>
@@ -320,12 +298,14 @@ export default function StartupExplorer() {
           <button className="panel-close" onClick={() => setSelected(null)} aria-label="Close details">×</button>
           <div className="panel-top"><CompanyLogo startup={selected} /><p className="eyebrow">{classifySector(selected.sector)}</p><h2>{selected.company}</h2><p className="panel-location">⌖ {selected.area}</p></div>
           {selected.description && <p className="panel-description">{selected.description}</p>}
-          <dl className="facts">
-            {selected.founded && <><dt>Founded</dt><dd>{selected.founded}</dd></>}
-            {selected.founders && <><dt>Founders</dt><dd>{selected.founders}</dd></>}
-            {selected.teamSize && <><dt>Team size</dt><dd>{selected.teamSize}</dd></>}
-            {selected.funding && <><dt>Funding</dt><dd>{selected.funding}</dd></>}
-          </dl>
+          {(selected.founded || selected.founders || selected.teamSize || selected.funding) && (
+            <dl className="facts">
+              {selected.founded && <><dt>Founded</dt><dd>{selected.founded}</dd></>}
+              {selected.founders && <><dt>Founders</dt><dd>{selected.founders}</dd></>}
+              {selected.teamSize && <><dt>Team size</dt><dd>{selected.teamSize}</dd></>}
+              {selected.funding && <><dt>Funding</dt><dd>{selected.funding}</dd></>}
+            </dl>
+          )}
           <div className="panel-links">
             {safeHref(selected.website) && <a href={safeHref(selected.website)} target="_blank" rel="noreferrer">Visit website <span>↗</span></a>}
             {safeHref(selected.careers) && <a className="secondary" href={safeHref(selected.careers)} target="_blank" rel="noreferrer">Careers</a>}
@@ -366,8 +346,6 @@ export default function StartupExplorer() {
           </section>
         </>
       )}
-
-      <footer className="credit">Made for Chennai’s startup community <span>•</span> Data from the community</footer>
     </main>
   );
 }
@@ -383,23 +361,4 @@ function CompanyLogo({ startup }: { startup: Pick<Startup, "company" | "logoUrl"
 
 function EmptyState({ onClear }: { onClear: () => void }) {
   return <div className="empty-state"><span>⌁</span><h2>No companies found</h2><p>Try a broader search or clear the active filters.</p><button onClick={onClear}>Clear filters</button></div>;
-}
-
-function HotspotPanel({ hotspots }: { hotspots: Hotspot[] }) {
-  const maximum = hotspots[0]?.count || 1;
-  return (
-    <aside className="hotspot-panel" aria-label="Chennai startup area heatmap">
-      <div className="hotspot-heading"><span>◉</span><div><b>Startup heatmap</b><p>Top Chennai areas</p></div></div>
-      <div className="hotspot-list">
-        {hotspots.map((hotspot, index) => (
-          <div className="hotspot-row" key={hotspot.area}>
-            <span>{index + 1}</span>
-            <div><p>{hotspot.area}</p><i style={{ width: `${Math.max(18, (hotspot.count / maximum) * 100)}%` }} /></div>
-            <b>{hotspot.count}</b>
-          </div>
-        ))}
-      </div>
-      <div className="heat-scale"><span>Lower</span><i /><span>Higher</span></div>
-    </aside>
-  );
 }
