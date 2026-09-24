@@ -19,7 +19,7 @@ The checked-in dataset lives at `public/data/startups.csv`. To refresh it from t
 npm run sync-data
 ```
 
-The map currently supports search, area and sector filters, circular logo clustering, a Chennai-area startup heatmap, a grid directory, company detail panels, dataset-backed jobs filtering, mobile layouts, and records without coordinates (available through grid/search).
+The map currently supports search, area and sector filters, circular logo clustering, a grid directory, company detail panels, dataset-backed jobs filtering, mobile layouts, and records without coordinates (available through grid/search).
 
 ## Startup submissions
 
