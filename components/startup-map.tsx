@@ -32,9 +32,9 @@ export default function StartupMap({ startups, selected, onSelect }: StartupMapP
       className="map-canvas"
     >
       <TileLayer
-        attribution='Sources: <a href="https://www.esri.com/en-us/legal/terms/data-attributions">Esri</a>, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, and the GIS User Community'
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={16}
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxNativeZoom={19}
         maxZoom={20}
       />
       <ClusteredMarkers startups={startups} selected={selected} onSelect={onSelect} />
