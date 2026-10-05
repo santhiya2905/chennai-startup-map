@@ -193,10 +193,10 @@ export default function StartupExplorer() {
     <main className="explorer-shell">
       <header className="toolbar-wrap">
         <div className="toolbar">
-          <a className="brand" href="#" aria-label="Chennai Startup Map home">
-            <span className="brand-mark" aria-hidden="true"><i /></span>
+          <div className="brand" aria-label="Chennai Startup Map">
+            <span className="brand-mark" aria-hidden="true">C</span>
             <span className="brand-copy"><b>Chennai</b><em> Startup Map</em></span>
-          </a>
+          </div>
 
           <label className="search-box">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" /></svg>
@@ -265,7 +265,7 @@ export default function StartupExplorer() {
         <section className="map-view" aria-label="Map of Chennai startups">
           <StartupMap startups={filtered} selected={selected} onSelect={setSelected} />
           <div className="result-pill"><span className="pulse" /> <b>{filtered.length.toLocaleString("en-IN")}</b> companies found</div>
-          <div className="by-pill">by S &amp; Y</div>
+          <a className="by-pill" href="/creators">by S &amp; Y</a>
           <div className="map-key"><span>◆</span><p>Company locations</p></div>
           {filtered.length === 0 && <EmptyState onClear={clearFilters} />}
         </section>
