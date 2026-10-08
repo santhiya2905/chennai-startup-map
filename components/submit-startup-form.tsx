@@ -46,16 +46,16 @@ export default function SubmitStartupForm() {
         ) : (
           <>
             <h1>Submit a startup</h1>
-            <p className="submit-intro">Know a Chennai startup that should be on the map? Fill in what you know. Only the company name and one-line description are required.</p>
+            <p className="submit-intro">Know a Chennai startup that should be on the map? Fill in what you know. Company name, website, one-line description and your email are required.</p>
             <form className="submit-form" onSubmit={submitStartup}>
               <label className="honeypot" aria-hidden="true">Company URL<input name="company_url" tabIndex={-1} autoComplete="off" /></label>
               <FormField label="Company name" required><input name="name" required maxLength={120} /></FormField>
-              <FormField label="Website"><input name="website" type="url" placeholder="https://…" /></FormField>
+              <FormField label="Website" required><input name="website" type="url" required placeholder="https://…" /></FormField>
               <FormField label="One-line description" hint="What they do, in a sentence" required><input name="tagline" required maxLength={200} /></FormField>
               <FormField label="More details" hint="Founders, location, sector, funding or anything useful"><textarea name="description" rows={4} maxLength={1200} /></FormField>
               <div className="submit-form-grid">
                 <FormField label="Stage"><select name="stage" defaultValue=""><option value="" disabled>Select a stage…</option>{["Bootstrapped", "Pre-seed", "Seed", "Series A", "Series B", "Series C+", "Public", "Acquired"].map((stage) => <option key={stage}>{stage}</option>)}</select></FormField>
-                <FormField label="Your email"><input name="email" type="email" placeholder="you@example.com" /></FormField>
+                <FormField label="Your email" required><input name="email" type="email" required placeholder="you@example.com" /></FormField>
               </div>
               <FormField label="Hiring?" hint="Link to your careers page or active job listings"><input name="jobs_url" type="url" placeholder="https://yourcompany.com/careers" maxLength={300} /></FormField>
               {status === "error" && <p className="submit-error" role="alert">{message}</p>}

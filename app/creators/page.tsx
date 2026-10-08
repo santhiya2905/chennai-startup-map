@@ -29,13 +29,10 @@ const creators = [
 function CreatorAvatar({ photo, initial, color, name }: { photo: string; initial: string; color: string; name: string }) {
   const [failed, setFailed] = useState(false);
   return (
-    <div className="creator-avatar-wrap" style={{ "--avatar-color": color } as React.CSSProperties}>
-      <div className="creator-avatar-ring" />
-      <div className="creator-avatar">
+    <div className="creator-portrait" style={{ "--avatar-color": color } as React.CSSProperties}>
         {photo && !failed
           ? <img src={photo} alt={name} onError={() => setFailed(true)} />
           : <span>{initial}</span>}
-      </div>
     </div>
   );
 }
@@ -43,22 +40,21 @@ function CreatorAvatar({ photo, initial, color, name }: { photo: string; initial
 export default function CreatorsPage() {
   return (
     <main className="creators-page">
-      <div className="creators-bg" aria-hidden="true" />
+      <nav className="creators-nav" aria-label="Creators page navigation">
+        <Link href="/" className="creators-brand">Chennai Startup Map<span aria-hidden="true">↗</span></Link>
+        <span className="creators-nav-label">The people behind the map</span>
+        <Link href="/" className="creators-back">Back to map <span aria-hidden="true">↗</span></Link>
+      </nav>
 
-      <Link href="/" className="creators-back">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
-        Back to map
-      </Link>
-
-      <header className="creators-header">
-        <p className="creators-eyebrow">The people behind it</p>
-        <h1 className="creators-title">Made with care,<br />for People.</h1>
-        <p className="creators-subtitle">
-          Chennai Startup Map is an independent project built to spotlight the startups, founders, and builders shaping the city's future.
-        </p>
-      </header>
-
-      <div className="creators-grid">
+      <section className="creators-stage" aria-labelledby="creators-title">
+        <header className="creators-header">
+          <p className="creators-eyebrow"><span aria-hidden="true" /> Built in Chennai. For Chennai.</p>
+          <h1 id="creators-title" className="creators-title">CREATORS</h1>
+        </header>
+        <svg className="creators-ribbons" viewBox="0 0 1440 980" preserveAspectRatio="none" aria-hidden="true">
+          <path className="creators-contour" d="M-80 730 C220 590 360 880 660 733 S1110 430 1500 635 M-80 755 C220 615 360 905 660 758 S1110 455 1500 660" />
+        </svg>
+        <div className="creators-grid">
         {creators.map((c) => (
           <a
             key={c.handle}
@@ -66,31 +62,33 @@ export default function CreatorsPage() {
             target="_blank"
             rel="noreferrer"
             className="creator-card"
+            aria-label={`${c.name}, ${c.role} — view LinkedIn profile (opens in a new tab)`}
           >
-            <div className="creator-glow" style={{ background: c.color }} aria-hidden="true" />
+            <span className="creator-card-number" aria-hidden="true">0{creators.indexOf(c) + 1} / Co-creator</span>
             <CreatorAvatar photo={c.photo} initial={c.initial} color={c.color} name={c.name} />
             <div className="creator-body">
-              <p className="creator-role">{c.role}</p>
               <h2 className="creator-name">{c.name}</h2>
+              <p className="creator-role">{c.role} <span aria-hidden="true">·</span> Chennai Startup Map</p>
               <p className="creator-bio">{c.bio}</p>
             </div>
             <div className="creator-footer">
               <span className="creator-linkedin">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z" />
-                  <circle cx="4" cy="4" r="2" />
-                </svg>
-                View on LinkedIn
+                Let’s connect <span>LinkedIn</span>
               </span>
               <span className="creator-arrow">↗</span>
             </div>
           </a>
         ))}
-      </div>
+        </div>
+        <div className="creators-caption"><span aria-hidden="true">↳</span><p>Two people. One shared curiosity.<br />A city full of builders.</p></div>
+      </section>
 
-      <footer className="creators-footer-note">
-        <span className="brand-mark-sm">C</span>
-        Chennai Startup Map · Open to contributions
+      <footer className="creators-footer">
+        <p className="creators-footer-heading">Made with care.<br /><em>For the people building here.</em></p>
+        <div className="creators-footer-details">
+          <p>Chennai Startup Map is an independent project built to spotlight the startups, founders, and builders shaping the city’s future.</p>
+          <Link href="/submit">Know a company we should add? <span aria-hidden="true">↗</span></Link>
+        </div>
       </footer>
     </main>
   );
